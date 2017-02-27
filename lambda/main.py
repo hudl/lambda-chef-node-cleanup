@@ -44,10 +44,20 @@ def get_instance_id(event):
         LOGGER.error(err)
         return False
 
+def get_clear_pem():
+    """We're doin it live with clear text to get USERNAME's pem file"""
+    try:
+        with open('chef12.pem', 'r') as clear_pem:
+            pem_file = clear_pem.read()
+        return pem_file
+    except PemError as err:
+        LOGGER.error(err)
+        return False
+
 def get_pem():
     """Decrypt the Ciphertext Blob to get USERNAME's pem file"""
     try:
-        with open('encrypted_pem.txt', 'r') as encrypted_pem:
+        with open('chef12_encrypted.pem', 'r') as encrypted_pem:
             pem_file = encrypted_pem.read()
 
         kms = boto3.client('kms', region_name=REGION)
@@ -62,10 +72,10 @@ def handle(event, _context):
 
     # If you're using a self signed certificate change
     # the ssl_verify argument to False
-    with chef.ChefAPI(CHEF_SERVER_URL, get_pem(), USERNAME, ssl_verify=VERIFY_SSL):
+    with chef.ChefAPI(CHEF_SERVER_URL, get_clear_pem(), USERNAME, ssl_verify=VERIFY_SSL):
         instance_id = get_instance_id(event)
         try:
-            search = chef.Search('node', 'ec2_instance_id:' + instance_id)
+            search = chef.Search('node', 'instance_id:' + instance_id)
         except ChefServerNotFoundError as err:
             LOGGER.error(err)
             return False
