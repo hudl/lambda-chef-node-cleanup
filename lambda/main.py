@@ -55,10 +55,10 @@ def get_clear_pem(keyfile=None):
         LOGGER.error(err)
         return False
 
-def get_pem():
+def get_pem(keyfile=None):
     """Decrypt the Ciphertext Blob to get USERNAME's pem file"""
     try:
-        with open('chef12_encrypted.pem', 'r') as encrypted_pem:
+        with open(keyfile, 'r') as encrypted_pem:
             pem_file = encrypted_pem.read()
 
         kms = boto3.client('kms', region_name=REGION)
@@ -93,14 +93,14 @@ def handle(event, _context):
 
     # If you're using a self signed certificate change
     # the ssl_verify argument to False
-    with chef.ChefAPI(CHEF_SERVER_URL, get_clear_pem('chef12.pem'), USERNAME, ssl_verify=VERIFY_SSL):
+    with chef.ChefAPI(CHEF_SERVER_URL, get_pem('chef12_encrypted.pem'), USERNAME, ssl_verify=VERIFY_SSL):
         instance_id = get_instance_id(event)
         search = chef.Search('node', 'instance_id:' + instance_id)
         if len(search) != 0:
             LOGGER.info('found in chef12')
             node_deleted = delete_node(search)
 
-    with chef.ChefAPI(CHEF11_SERVER_URL, get_clear_pem('chef11.pem'), USERNAME, ssl_verify=VERIFY_SSL):
+    with chef.ChefAPI(CHEF11_SERVER_URL, get_pem('chef11_encrypted.pem'), USERNAME, ssl_verify=VERIFY_SSL):
         instance_id = get_instance_id(event)
         search = chef.Search('node', 'instance_id:' + instance_id)
         if len(search) != 0:
