@@ -21,6 +21,7 @@ Chef Server uses public key encryption to authenticate API requests.  This requi
 1. [Create a customer master key (CMK) in KMS](http://docs.aws.amazon.com/kms/latest/developerguide/create-keys.html) and note the keyId that is automatically generated.
   * If you will use the supplied Terraform example in this repository you do not need to add a Key User yet.  If you are following this as a reference and already have an IAM role for your Lambda function you can add it now as a Key User.  Your IAM user needs kms.encrypt permissions to encrypt the certificate, while your Lambda user (via an IAM role) needs kms.decrypt permissions at runtime to access the certificate.
 2. Encrypt the certificate in KMS using the AWS CLI tools:  `aws kms encrypt --key-id KEY_FROM_STEP_1 --plaintext file://your_private_key.pem`
+  * aws kms encrypt --key-id 36c03bba-c32d-4162-8a12-10037963ffbc --plaintext fileb://chef1x.pem --query CiphertextBlob --output text|base64 -D|base64 -b 76 > chef1x_encrypted.pem (on osx)
 3.	You will receive a response with a CiphertextBlob if successful.  An example of a successful response will look like:
   ```
   {
