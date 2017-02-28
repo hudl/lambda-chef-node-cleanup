@@ -27,6 +27,7 @@ LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
 REGION= local_config.REGION
 CHEF_SERVER_URL = local_config.CHEF_SERVER_URL
+CHEF11_SERVER_URL = local_config.CHEF11_SERVER_URL
 USERNAME = local_config.USERNAME
 VERIFY_SSL = local_config.VERIFY_SSL
 
@@ -44,10 +45,10 @@ def get_instance_id(event):
         LOGGER.error(err)
         return False
 
-def get_clear_pem():
+def get_clear_pem(keyfile=None):
     """We're doin it live with clear text to get USERNAME's pem file"""
     try:
-        with open('chef12.pem', 'r') as clear_pem:
+        with open(keyfile, 'r') as clear_pem:
             pem_file = clear_pem.read()
         return pem_file
     except PemError as err:
@@ -66,33 +67,46 @@ def get_pem():
         LOGGER.error(err)
         return False
 
+def delete_node(search=None):
+    if search is not None:
+        for instance in search:
+            node = chef.Node(instance.object.name)
+            client = chef.Client(instance.object.name) 
+
+            try:
+                node.delete()
+                LOGGER.info('===Node Delete: SUCCESS===')
+                client.delete()
+                LOGGER.info('===Client Delete: SUCCESS===')
+                return True
+            except ChefServerNotFoundError as err:
+                LOGGER.error(err)
+                return True
+    else:
+        return False
+
 def handle(event, _context):
     """Lambda Handler"""
     log_event(event)
 
+    node_deleted = False
+
     # If you're using a self signed certificate change
     # the ssl_verify argument to False
-    with chef.ChefAPI(CHEF_SERVER_URL, get_clear_pem(), USERNAME, ssl_verify=VERIFY_SSL):
+    with chef.ChefAPI(CHEF_SERVER_URL, get_clear_pem('chef12.pem'), USERNAME, ssl_verify=VERIFY_SSL):
         instance_id = get_instance_id(event)
-        try:
-            search = chef.Search('node', 'instance_id:' + instance_id)
-        except ChefServerNotFoundError as err:
-            LOGGER.error(err)
-            return False
-
+        search = chef.Search('node', 'instance_id:' + instance_id)
         if len(search) != 0:
-            for instance in search:
-                node = chef.Node(instance.object.name)
-                client = chef.Client(instance.object.name)
-                try:
-                    node.delete()
-                    LOGGER.info('===Node Delete: SUCCESS===')
-                    client.delete()
-                    LOGGER.info('===Client Delete: SUCCESS===')
-                    return True
-                except ChefServerNotFoundError as err:
-                    LOGGER.error(err)
-                    return False
-        else:
+            LOGGER.info('found in chef12')
+            node_deleted = delete_node(search)
+
+    with chef.ChefAPI(CHEF11_SERVER_URL, get_clear_pem('chef11.pem'), USERNAME, ssl_verify=VERIFY_SSL):
+        instance_id = get_instance_id(event)
+        search = chef.Search('node', 'instance_id:' + instance_id)
+        if len(search) != 0:
+            LOGGER.info('found in chef11')
+            node_deleted = delete_node(search)
+
+        if node_deleted is False:
             LOGGER.info('=Instance does not appear to be Chef Server managed.=')
-            return True
+            
